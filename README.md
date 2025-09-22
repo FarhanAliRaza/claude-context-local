@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/farhanaliraza-claude-context-local-badge.png)](https://mseep.ai/app/farhanaliraza-claude-context-local)
+
 ```
   ██████╗ ██╗       █████╗  ██╗   ██╗ ██████╗  ███████╗
  ██╔════╝ ██║      ██╔══██╗ ██║   ██║ ██╔══██╗ ██╔════╝
