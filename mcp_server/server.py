@@ -19,6 +19,7 @@ except ImportError:
 
 from chunking.multi_language_chunker import MultiLanguageChunker
 from embeddings.embedder import CodeEmbedder
+from embeddings.llama_embedder import LlamaServerEmbedder
 from search.indexer import CodeIndexManager
 from search.searcher import IntelligentSearcher
 
@@ -113,14 +114,27 @@ def ensure_project_indexed(project_path: str) -> bool:
         return False
 
 
-def get_embedder() -> CodeEmbedder:
+def get_embedder():
     """Lazy initialization of embedder."""
     global _embedder
     if _embedder is None:
-        cache_dir = get_storage_dir() / "models"
-        cache_dir.mkdir(exist_ok=True)
-        _embedder = CodeEmbedder(cache_dir=str(cache_dir))
-        logger.info("Embedder initialized")
+        # Check if llama-server should be used
+        use_llama = os.getenv('USE_LLAMA_SERVER', 'true').lower() == 'true'
+        llama_url = os.getenv('LLAMA_SERVER_URL', 'http://localhost:10101')
+
+        if use_llama:
+            # Get configurable timeout and batch size
+            timeout = int(os.getenv('LLAMA_SERVER_TIMEOUT', os.getenv('CLAUDE_MCP_LLAMA_TIMEOUT', '60')))
+            batch_size = int(os.getenv('LLAMA_SERVER_BATCH_SIZE', os.getenv('CLAUDE_MCP_LLAMA_BATCH', '32')))
+            logger.info(
+                f"Using llama-server embedder at {llama_url} (timeout: {timeout}s, batch_size: {batch_size})"
+            )
+            _embedder = LlamaServerEmbedder(base_url=llama_url, timeout=timeout, batch_size=batch_size)
+        else:
+            cache_dir = get_storage_dir() / "models"
+            cache_dir.mkdir(exist_ok=True)
+            _embedder = CodeEmbedder(cache_dir=str(cache_dir))
+            logger.info("Using sentence-transformers embedder")
     return _embedder
 
 
@@ -134,8 +148,10 @@ def _maybe_start_model_preload() -> None:
     async def _preload():
         try:
             logger.info("Starting background model preload")
-            # Access the model property to trigger lazy load
-            _ = get_embedder().model
+            embedder = get_embedder()
+            # Only preload if using sentence-transformers (llama-server doesn't need preload)
+            if isinstance(embedder, CodeEmbedder):
+                _ = embedder.model
             logger.info("Background model preload completed")
         except Exception as e:
             logger.warning(f"Background model preload failed: {e}")

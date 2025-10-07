@@ -210,13 +210,22 @@ class IncrementalIndexer:
             all_embedding_results = []
             if all_chunks:
                 try:
-                    all_embedding_results = self.embedder.embed_chunks(all_chunks)
+                    embed_batch_size = getattr(self.embedder, "batch_size", None)
+                    all_embedding_results = self.embedder.embed_chunks(
+                        all_chunks,
+                        batch_size=embed_batch_size
+                    )
                     # Update metadata
                     for chunk, embedding_result in zip(all_chunks, all_embedding_results):
                         embedding_result.metadata['project_name'] = project_name
                         embedding_result.metadata['content'] = chunk.content
                 except Exception as e:
-                    logger.warning(f"Embedding failed: {e}")
+                    logger.warning(
+                        "Embedding failed for %d chunks (batch_size=%s): %s",
+                        len(all_chunks),
+                        embed_batch_size,
+                        e
+                    )
             
             # Add all embeddings to index at once
             if all_embedding_results:
